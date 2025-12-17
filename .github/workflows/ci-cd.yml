@@ -1,0 +1,79 @@
+name: Selenium CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  selenium-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Install Chrome
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+        
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest-cov
+        
+    - name: Run Selenium tests with pytest
+      run: |
+        mkdir -p reports
+        python -m pytest tests/ \
+          --cov=./ \
+          --cov-report=xml:coverage.xml \
+          --junitxml=reports/junit-report.xml \
+          -v \
+          --html=reports/test-report.html \
+          --self-contained-html
+        
+    - name: Upload test artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-reports
+        path: |
+          reports/
+          coverage.xml
+        retention-days: 30
+        
+  sonarqube-scan:
+    runs-on: ubuntu-latest
+    needs: selenium-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Download test artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: test-reports
+        merge-multiple: true
+        
+    - name: Set up Java for SonarQube
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+        
+    - name: Run SonarQube Scan
+      run: |
+        echo "SonarQube scan would run here"
+        echo "To enable actual scan, add SonarQube token to GitHub Secrets"
+        echo "and configure sonar-project.properties file"
